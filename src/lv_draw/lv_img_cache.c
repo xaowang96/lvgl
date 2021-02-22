@@ -13,9 +13,6 @@
 #include "../lv_hal/lv_hal_tick.h"
 #include "../lv_misc/lv_gc.h"
 
-#if defined(LV_GC_INCLUDE)
-    #include LV_GC_INCLUDE
-#endif /* LV_ENABLE_GC */
 /*********************
  *      DEFINES
  *********************/
@@ -37,14 +34,14 @@
  *  STATIC PROTOTYPES
  **********************/
 #if LV_IMG_CACHE_DEF_SIZE == 0
-static lv_img_cache_entry_t cache_temp;
+    static lv_img_cache_entry_t cache_temp;
 #endif
 
 /**********************
  *  STATIC VARIABLES
  **********************/
 #if LV_IMG_CACHE_DEF_SIZE
-static uint16_t entry_cnt;
+    static uint16_t entry_cnt;
 #endif
 
 /**********************
@@ -130,10 +127,8 @@ lv_img_cache_entry_t * _lv_img_cache_open(const void * src, lv_color_t color)
     cached_src = &cache_temp;
 #endif
     /*Open the image and measure the time to open*/
-    uint32_t t_start;
-    t_start                          = lv_tick_get();
-    cached_src->dec_dsc.time_to_open = 0;
-    lv_res_t open_res                = lv_img_decoder_open(&cached_src->dec_dsc, src, color);
+    uint32_t t_start  = lv_tick_get();
+    lv_res_t open_res = lv_img_decoder_open(&cached_src->dec_dsc, src, color);
     if(open_res == LV_RES_INV) {
         LV_LOG_WARN("Image draw cannot open the image resource");
         lv_img_decoder_close(&cached_src->dec_dsc);

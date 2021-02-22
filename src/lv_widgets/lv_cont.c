@@ -28,7 +28,7 @@
 #define LV_OBJX_NAME "lv_cont"
 
 #ifndef LV_LAYOUT_MAX_RECURSION
-#define LV_LAYOUT_MAX_RECURSION 10
+    #define LV_LAYOUT_MAX_RECURSION 10
 #endif
 
 /**********************
@@ -103,7 +103,6 @@ lv_obj_t * lv_cont_create(lv_obj_t * par, const lv_obj_t * copy)
         if(par != NULL) {
             lv_theme_apply(cont, LV_THEME_CONT);
         }
-
 
     }
     /*Copy an existing object*/
@@ -291,7 +290,6 @@ static lv_res_t lv_cont_signal(lv_obj_t * cont, lv_signal_t sign, void * param)
 
     return res;
 }
-
 
 static lv_style_list_t * lv_cont_get_style(lv_obj_t * cont, uint8_t type)
 {
@@ -510,7 +508,7 @@ static void lv_cont_layout_pretty(lv_obj_t * cont)
     lv_coord_t pright         =  lv_obj_get_style_pad_right(cont, LV_CONT_PART_MAIN);
     lv_coord_t pinner = lv_obj_get_style_pad_inner(cont, LV_CONT_PART_MAIN);
 
-    child_rc = child_rs; /*Initially the the row starter and closer is the same*/
+    child_rc = child_rs; /*Initially the row starter and closer is the same*/
     while(child_rs != NULL) {
         lv_coord_t h_row = 0;
         lv_coord_t w_row = pleft + pright; /*The width is at least the left+right pad*/
@@ -787,7 +785,7 @@ static void lv_cont_refr_autofit(lv_obj_t * cont)
 
         /*Do nothing if the coordinates are not changed*/
         if(cont->coords.x1 != new_area.x1 || cont->coords.y1 != new_area.y1 || cont->coords.x2 != new_area.x2 ||
-        cont->coords.y2 != new_area.y2) {
+           cont->coords.y2 != new_area.y2) {
 
             lv_obj_invalidate(cont);
             lv_area_copy(&cont->coords, &new_area);
@@ -808,7 +806,8 @@ static void lv_cont_refr_autofit(lv_obj_t * cont)
                 child_i->signal_cb(child_i, LV_SIGNAL_PARENT_SIZE_CHG, &ori);
             }
         }
-    } else {
+    }
+    else {
         LV_LOG_ERROR("LV_LAYOUT_MAX_RECURSION reached! You may have encountered issue #1539.");
     }
 
