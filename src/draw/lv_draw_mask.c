@@ -362,6 +362,233 @@ void lv_draw_mask_angle_init(lv_draw_mask_angle_param_t * param, lv_coord_t vert
     lv_draw_mask_line_angle_init(&param->end_line, vertex_x, vertex_y, end_angle, end_side);
 }
 
+
+/**
+ * Initialize the circle drawing
+ * @param c pointer to a point. The coordinates will be calculated here
+ * @param tmp point to a variable. It will store temporary data
+ * @param radius radius of the circle
+ */
+void lv_circ_init(lv_point_t * c, lv_coord_t * tmp, lv_coord_t radius)
+{
+    c->x = radius;
+    c->y = 0;
+    *tmp = 1 - radius;
+}
+
+/**
+ * Test the circle drawing is ready or not
+ * @param c same as in circ_init
+ * @return true if the circle is not ready yet
+ */
+bool lv_circ_cont(lv_point_t * c)
+{
+    return c->y <= c->x ? true : false;
+}
+
+/**
+ * Get the next point from the circle
+ * @param c same as in circ_init. The next point stored here.
+ * @param tmp same as in circ_init.
+ */
+void lv_circ_next(lv_point_t * c, lv_coord_t * tmp)
+{
+
+    if(*tmp <= 0) {
+        (*tmp) += 2 * c->y + 3; /*Change in decision criterion for y -> y+1*/
+    } else {
+        (*tmp) += 2 * (c->y - c->x) + 5; /*Change for y -> y+1, x -> x-1*/
+        c->x--;
+    }
+    c->y++;
+}
+
+static int32_t cir_x[100];
+static int32_t cir_y[100];
+static lv_opa_t cir_opa[100];
+static uint32_t cir_size;
+static uint32_t cir_r = 0xFFFFFFFF;
+uint8_t x_start_on_y[100];
+uint8_t opa_start_on_y[100];
+
+#define AA_EXTRA 1
+
+static void cir_calc_aa4(uint32_t r)
+{
+    uint32_t y_8th_cnt = 0;
+    lv_point_t p;
+    lv_coord_t tmp;
+    lv_circ_init(&p, &tmp, r * 4);
+    int32_t i;
+
+    uint32_t i_start = 1;
+    uint32_t x_int[4];
+    uint32_t x_fract[4];
+    cir_size = 0;
+    x_int[0] = p.x >> 2;
+    x_fract[0] = 0;
+    while(lv_circ_cont(&p)) {
+
+        for(i = i_start; i < 4 && lv_circ_cont(&p); i++) {
+            lv_circ_next(&p, &tmp);
+//            printf("y:%d, \tx:%d\n", p.y, p.x);
+            x_int[i] = p.x >> 2;
+            x_fract[i] = p.x & 0x3;
+        }
+//        printf("%d\n", i);
+        if(i != 4) break;
+
+        /*All lines on the same x when downscaled*/
+        if(x_int[0] == x_int[3]) {
+            cir_x[cir_size] = x_int[0];
+            cir_y[cir_size] = y_8th_cnt;
+            cir_opa[cir_size] = x_fract[0] + x_fract[1] + x_fract[2] + x_fract[3];
+//            printf("%d->", cir_opa[cir_size]);
+#if AA_EXTRA
+            cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
+            cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
+            cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
+#endif
+//            printf("%d\n", cir_opa[cir_size]);
+            cir_size++;
+        }
+        /*Second line on new x when downscaled*/
+        else if(x_int[0] != x_int[1]) {
+            cir_x[cir_size] = x_int[0];
+            cir_y[cir_size] = y_8th_cnt;
+            cir_opa[cir_size] = x_fract[0];
+            cir_size++;
+
+            cir_x[cir_size] = x_int[0] - 1;
+            cir_y[cir_size] = y_8th_cnt;
+            uint32_t tmp = 1 * 4 + x_fract[1] + x_fract[2] + x_fract[3];
+            cir_opa[cir_size] = tmp;
+#if AA_EXTRA
+            cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
+            cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
+#endif
+            cir_size++;
+        }
+        /*Third line on new x when downscaled*/
+        else if(x_int[0] != x_int[2]) {
+            cir_x[cir_size] = x_int[0];
+            cir_y[cir_size] = y_8th_cnt;
+            cir_opa[cir_size] = x_fract[0] + x_fract[1];
+#if AA_EXTRA
+            cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
+#endif
+            cir_size++;
+
+            cir_x[cir_size] = x_int[0] - 1;
+            cir_y[cir_size] = y_8th_cnt;
+            uint32_t tmp = 2 * 4 + x_fract[2] + x_fract[3];
+            cir_opa[cir_size] = tmp;
+#if AA_EXTRA
+            cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
+#endif
+            cir_size++;
+        }
+        /*Forth line on new x when downscaled*/
+        else {
+            cir_x[cir_size] = x_int[0];
+            cir_y[cir_size] = y_8th_cnt;
+            cir_opa[cir_size] = x_fract[0] + x_fract[1] + x_fract[2];
+#if AA_EXTRA
+            cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
+            cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
+#endif
+            cir_size++;
+
+            uint32_t tmp = 3 * 4 + x_fract[3];
+            cir_x[cir_size] = x_int[0] - 1;
+            cir_y[cir_size] = y_8th_cnt;
+            cir_opa[cir_size] = tmp;
+
+            cir_size++;
+        }
+
+        y_8th_cnt++;
+        i_start = 0;
+    }
+
+    uint32_t mid = r * 723;
+    uint32_t mid_int = mid >> 10;
+    if(cir_x[cir_size-1] != mid_int || cir_y[cir_size-1] != mid_int) {
+
+        tmp = mid - (mid_int << 10);
+        if(tmp <= 512) {
+            tmp = tmp * tmp * 2;
+            tmp = tmp >> (10 + 6);
+        } else {
+            tmp = 1024 - tmp;
+            tmp = tmp * tmp * 2;
+            tmp = tmp >> (10 + 6);
+            tmp = 15 - tmp;
+        }
+
+        cir_opa[cir_size] = tmp;
+        cir_x[cir_size] = mid_int;
+        cir_y[cir_size] = mid_int;
+//        printf("--b at %d\n", mid_int);
+        cir_size++;
+    }
+
+    /*Build the second octet*/
+
+    i_start = cir_size - 2;
+    for(i = i_start; i >= 0; i--, cir_size++) {
+        cir_x[cir_size] = cir_y[i];
+        cir_y[cir_size] = cir_x[i];
+        cir_opa[cir_size] = cir_opa[i];
+    }
+
+    for(i = 0; i < cir_size; i++) {
+        uint32_t opa = cir_opa[i] * 100 / 16;
+//        printf("%d: %d,%d: %d\n", i, cir_x[i], cir_y[i], opa);
+    }
+
+
+    memset(x_start_on_y, 0xff, sizeof(x_start_on_y));
+    memset(opa_start_on_y, 0xff, sizeof(opa_start_on_y));
+
+    uint32_t y = 0;
+    opa_start_on_y[0] = 0;
+    i = 0;
+    while(i < cir_size) {
+        opa_start_on_y[y] = i;
+        x_start_on_y[y] = cir_x[i];
+        for(; cir_y[i] == y && i < cir_size; i++) {
+            x_start_on_y[y] = LV_MIN(x_start_on_y[y], cir_x[i]);
+        }
+        y++;
+    }
+
+//    printf("----------\n");
+
+    for(y = 0; y < r; y++) {
+        printf("y:%d, ", y);
+        printf("x:%d: ", x_start_on_y[y]);
+        uint32_t k;
+        uint32_t len = opa_start_on_y[y + 1] - opa_start_on_y[y];
+        for(k = 0; k < len; k++) {
+//            printf("%d, ", cir_opa[opa_start_on_y[y] + k] * 100 / 16);
+        }
+//        printf("\n");
+
+    }
+
+
+}
+
+static lv_opa_t * get_next_line(lv_coord_t y, uint32_t * len, lv_coord_t * x_start)
+{
+
+    *len = opa_start_on_y[y + 1] - opa_start_on_y[y];
+    *x_start = x_start_on_y[y];
+    return &cir_opa[opa_start_on_y[y]];
+}
+
+
 /**
  * Initialize a fade mask.
  * @param param param pointer to a `lv_draw_mask_param_t` to initialize
@@ -381,9 +608,11 @@ void lv_draw_mask_radius_init(lv_draw_mask_radius_param_t * param, const lv_area
     param->cfg.outer = inv ? 1 : 0;
     param->dsc.cb = (lv_draw_mask_xcb_t)lv_draw_mask_radius;
     param->dsc.type = LV_DRAW_MASK_TYPE_RADIUS;
-    param->y_prev = INT32_MIN;
-    param->y_prev_x.f = 0;
-    param->y_prev_x.i = 0;
+
+    if(cir_r != radius) {
+        cir_calc_aa4(radius);
+        cir_r = radius;
+    }
 }
 
 /**
@@ -881,6 +1110,8 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_angle(lv_opa_t * ma
     }
 }
 
+
+
 LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_radius(lv_opa_t * mask_buf, lv_coord_t abs_x,
                                                                     lv_coord_t abs_y, lv_coord_t len,
                                                                     lv_draw_mask_radius_param_t * p)
@@ -939,194 +1170,33 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_radius(lv_opa_t * m
     abs_x -= rect.x1;
     abs_y -= rect.y1;
 
-    uint32_t r2 = p->cfg.radius * p->cfg.radius;
+    uint32_t aa_len;
+    uint32_t x_start;
+    lv_coord_t cir_y;
+    if(abs_y < radius) {
+        cir_y = radius - abs_y - 1;
+    } else {
+        cir_y = abs_y - (h - radius);
+    }
+    lv_opa_t * aa_opa = get_next_line(cir_y, &aa_len, &x_start);
+    lv_coord_t cir_x_right = w - radius + x_start;
+    lv_coord_t cir_x_left = radius - x_start;
+    uint32_t i;
+    for(i = 0; i < aa_len; i++) {
+        lv_opa_t opa = aa_opa[aa_len - i -1] * 16;
+        mask_buf[k + cir_x_right + i] = opa;
+        mask_buf[k + cir_x_left - i] = opa;
+//            printf("opa: %d\n", aa_opa[aa_len - i -1] * 100 / 16);
+    }
 
-    /*Handle corner areas*/
-    if(abs_y < radius || abs_y > h - radius - 1) {
+    /*Clean the right side*/
+    if(k + cir_x_right + i < len) {
+        lv_memset_00(&mask_buf[k + cir_x_right + i], len - (k + cir_x_right + i));
+    }
 
-        uint32_t sqrt_mask;
-        if(radius <= 32) sqrt_mask = 0x200;
-        if(radius <= 256) sqrt_mask = 0x800;
-        else sqrt_mask = 0x8000;
-
-        lv_sqrt_res_t x0;
-        lv_sqrt_res_t x1;
-        /*y = 0 should mean the top of the circle*/
-        int32_t y;
-        if(abs_y < radius) {
-            y = radius - abs_y;
-
-            /*Get the x intersection points for `abs_y` and `abs_y-1`
-             *Use the circle's equation x = sqrt(r^2 - y^2)
-             *Try to use the values from the previous run*/
-            if(y == p->y_prev) {
-                x0.f = p->y_prev_x.f;
-                x0.i = p->y_prev_x.i;
-            }
-            else {
-                lv_sqrt(r2 - (y * y), &x0, sqrt_mask);
-            }
-            lv_sqrt(r2 - ((y - 1) * (y - 1)), &x1, sqrt_mask);
-            p->y_prev = y - 1;
-            p->y_prev_x.f = x1.f;
-            p->y_prev_x.i = x1.i;
-        }
-        else {
-            y = radius - (h - abs_y) + 1;
-
-            /*Get the x intersection points for `abs_y` and `abs_y-1`
-             *Use the circle's equation x = sqrt(r^2 - y^2)
-             *Try to use the values from the previous run*/
-            if((y - 1) == p->y_prev) {
-                x1.f = p->y_prev_x.f;
-                x1.i = p->y_prev_x.i;
-            }
-            else {
-                lv_sqrt(r2 - ((y - 1) * (y - 1)), &x1, sqrt_mask);
-            }
-
-            lv_sqrt(r2 - (y * y), &x0, sqrt_mask);
-            p->y_prev = y;
-            p->y_prev_x.f = x0.f;
-            p->y_prev_x.i = x0.i;
-        }
-
-        /*If x1 is on the next round coordinate (e.g. x0: 3.5, x1:4.0)
-         *then treat x1 as x1: 3.99 to handle them as they were on the same pixel*/
-        if(x0.i == x1.i - 1 && x1.f == 0) {
-            x1.i--;
-            x1.f = 0xFF;
-        }
-
-        /*If the two x intersections are on the same x then just get average of the fractions*/
-        if(x0.i == x1.i) {
-            lv_opa_t m = (x0.f + x1.f) >> 1;
-            if(outer) m = 255 - m;
-            int32_t ofs = radius - x0.i - 1;
-
-            /*Left corner*/
-            int32_t kl = k + ofs;
-
-            if(kl >= 0 && kl < len) {
-                mask_buf[kl] = mask_mix(mask_buf[kl], m);
-            }
-
-            /*Right corner*/
-            int32_t kr = k + (w - ofs - 1);
-            if(kr >= 0 && kr < len) {
-                mask_buf[kr] = mask_mix(mask_buf[kr], m);
-            }
-
-            /*Clear the unused parts*/
-            if(outer == false) {
-                kr++;
-                if(kl > len)  {
-                    return LV_DRAW_MASK_RES_TRANSP;
-                }
-                if(kl >= 0) {
-                    lv_memset_00(&mask_buf[0], kl);
-                }
-                if(kr < 0) {
-                    return LV_DRAW_MASK_RES_TRANSP;
-                }
-                if(kr <= len) {
-                    lv_memset_00(&mask_buf[kr], len - kr);
-                }
-            }
-            else {
-                kl++;
-                int32_t first = kl;
-                if(first < 0) first = 0;
-
-                int32_t len_tmp = kr - first;
-                if(len_tmp + first > len) len_tmp = len - first;
-                if(first < len && len_tmp >= 0) {
-                    lv_memset_00(&mask_buf[first], len_tmp);
-                }
-            }
-        }
-        /*Multiple pixels are affected. Get y intersection of the pixels*/
-        else {
-            int32_t ofs = radius - (x0.i + 1);
-            int32_t kl = k + ofs;
-            int32_t kr = k + (w - ofs - 1);
-
-            if(outer) {
-                int32_t first = kl + 1;
-                if(first < 0) first = 0;
-
-                int32_t len_tmp = kr - first;
-                if(len_tmp + first > len) len_tmp = len - first;
-                if(first < len && len_tmp >= 0) {
-                    lv_memset_00(&mask_buf[first], len_tmp);
-                }
-            }
-
-            uint32_t i = x0.i + 1;
-            lv_opa_t m;
-            lv_sqrt_res_t y_prev;
-            lv_sqrt_res_t y_next;
-
-            lv_sqrt(r2 - (x0.i * x0.i), &y_prev, sqrt_mask);
-
-            if(y_prev.f == 0) {
-                y_prev.i--;
-                y_prev.f = 0xFF;
-            }
-
-            /*The first y intersection is special as it might be in the previous line*/
-            if(y_prev.i >= y) {
-                lv_sqrt(r2 - (i * i), &y_next, sqrt_mask);
-                m = 255 - (((255 - x0.f) * (255 - y_next.f)) >> 9);
-
-                if(outer) m = 255 - m;
-                if(kl >= 0 && kl < len) mask_buf[kl] = mask_mix(mask_buf[kl], m);
-                if(kr >= 0 && kr < len) mask_buf[kr] = mask_mix(mask_buf[kr], m);
-                kl--;
-                kr++;
-                y_prev.f = y_next.f;
-                i++;
-            }
-
-            /*Set all points which are crossed by the circle*/
-            for(; i <= x1.i; i++) {
-                /*These values are very close to each other. It's enough to approximate sqrt
-                 *The non-approximated version is lv_sqrt(r2 - (i * i), &y_next, sqrt_mask);*/
-                sqrt_approx(&y_next, &y_prev, r2 - (i * i));
-
-                m = (y_prev.f + y_next.f) >> 1;
-                if(outer) m = 255 - m;
-                if(kl >= 0 && kl < len) mask_buf[kl] = mask_mix(mask_buf[kl], m);
-                if(kr >= 0 && kr < len) mask_buf[kr] = mask_mix(mask_buf[kr], m);
-                kl--;
-                kr++;
-                y_prev.f = y_next.f;
-            }
-
-            /*If the last pixel was left in its middle therefore
-             * the circle still has parts on the next one*/
-            if(y_prev.f) {
-                m = (y_prev.f * x1.f) >> 9;
-                if(outer) m = 255 - m;
-                if(kl >= 0 && kl < len) mask_buf[kl] = mask_mix(mask_buf[kl], m);
-                if(kr >= 0 && kr < len) mask_buf[kr] = mask_mix(mask_buf[kr], m);
-                kl--;
-                kr++;
-            }
-
-            if(outer == 0) {
-                kl++;
-                if(kl > len) {
-                    return LV_DRAW_MASK_RES_TRANSP;
-                }
-                if(kl >= 0) lv_memset_00(&mask_buf[0], kl);
-
-                if(kr < 0) {
-                    return LV_DRAW_MASK_RES_TRANSP;
-                }
-                if(kr < len) lv_memset_00(&mask_buf[kr], len - kr);
-            }
-        }
+    /*Clean the left side*/
+    if(k + cir_x_left + 1 > aa_len ) {
+        lv_memset_00(&mask_buf[k], k + cir_x_left - aa_len + 1);
     }
 
     return LV_DRAW_MASK_RES_CHANGED;
