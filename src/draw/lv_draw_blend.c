@@ -427,7 +427,7 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
                     if((*mask32) == 0xFFFFFFFF) {
                         if((lv_uintptr_t)disp_buf_first & 0x3) {
                             *(disp_buf_first + 0) = color;
-                            uint32_t * d = (uint32_t * )disp_buf_first + 1;
+                            uint32_t * d = (uint32_t * )(disp_buf_first + 1);
                             *d = c32;
                             *(disp_buf_first + 3) = color;
                         } else {

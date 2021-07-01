@@ -50,7 +50,6 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t line_mask_steep(lv_opa_t * mask_
                                                                 lv_draw_mask_line_param_t * p);
 
 LV_ATTRIBUTE_FAST_MEM static inline lv_opa_t mask_mix(lv_opa_t mask_act, lv_opa_t mask_new);
-LV_ATTRIBUTE_FAST_MEM static inline void sqrt_approx(lv_sqrt_res_t * q, lv_sqrt_res_t * ref, uint32_t x);
 
 /**********************
  *  STATIC VARIABLES
@@ -403,69 +402,60 @@ void lv_circ_next(lv_point_t * c, lv_coord_t * tmp)
     c->y++;
 }
 
-static int32_t cir_x[100];
-static int32_t cir_y[100];
-static lv_opa_t cir_opa[100];
-static uint32_t cir_size;
-static uint32_t cir_r = 0xFFFFFFFF;
-uint8_t x_start_on_y[100];
-uint8_t opa_start_on_y[100];
-
 #define AA_EXTRA 1
 
-static void cir_calc_aa4(uint32_t r)
+static void cir_calc_aa4(lv_draw_mask_radius_param_t * p)
 {
     uint32_t y_8th_cnt = 0;
-    lv_point_t p;
+    lv_point_t cp;
     lv_coord_t tmp;
-    lv_circ_init(&p, &tmp, r * 4);
+    lv_circ_init(&cp, &tmp, p->cfg.radius * 4);
     int32_t i;
+
+    int32_t cir_x[1000];
+    int32_t cir_y[1000];
 
     uint32_t i_start = 1;
     uint32_t x_int[4];
     uint32_t x_fract[4];
-    cir_size = 0;
-    x_int[0] = p.x >> 2;
+    uint32_t cir_size = 0;
+    x_int[0] = cp.x >> 2;
     x_fract[0] = 0;
-    while(lv_circ_cont(&p)) {
+    while(lv_circ_cont(&cp)) {
 
-        for(i = i_start; i < 4 && lv_circ_cont(&p); i++) {
-            lv_circ_next(&p, &tmp);
-//            printf("y:%d, \tx:%d\n", p.y, p.x);
-            x_int[i] = p.x >> 2;
-            x_fract[i] = p.x & 0x3;
+        for(i = i_start; i < 4 && lv_circ_cont(&cp); i++) {
+            lv_circ_next(&cp, &tmp);
+            x_int[i] = cp.x >> 2;
+            x_fract[i] = cp.x & 0x3;
         }
-//        printf("%d\n", i);
         if(i != 4) break;
 
         /*All lines on the same x when downscaled*/
         if(x_int[0] == x_int[3]) {
             cir_x[cir_size] = x_int[0];
             cir_y[cir_size] = y_8th_cnt;
-            cir_opa[cir_size] = x_fract[0] + x_fract[1] + x_fract[2] + x_fract[3];
-//            printf("%d->", cir_opa[cir_size]);
+            p->cir_opa[cir_size] = x_fract[0] + x_fract[1] + x_fract[2] + x_fract[3];
 #if AA_EXTRA
-            cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
-            cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
-            cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
 #endif
-//            printf("%d\n", cir_opa[cir_size]);
             cir_size++;
         }
         /*Second line on new x when downscaled*/
         else if(x_int[0] != x_int[1]) {
             cir_x[cir_size] = x_int[0];
             cir_y[cir_size] = y_8th_cnt;
-            cir_opa[cir_size] = x_fract[0];
+            p->cir_opa[cir_size] = x_fract[0];
             cir_size++;
 
             cir_x[cir_size] = x_int[0] - 1;
             cir_y[cir_size] = y_8th_cnt;
             uint32_t tmp = 1 * 4 + x_fract[1] + x_fract[2] + x_fract[3];
-            cir_opa[cir_size] = tmp;
+            p->cir_opa[cir_size] = tmp;
 #if AA_EXTRA
-            cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
-            cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
 #endif
             cir_size++;
         }
@@ -473,18 +463,18 @@ static void cir_calc_aa4(uint32_t r)
         else if(x_int[0] != x_int[2]) {
             cir_x[cir_size] = x_int[0];
             cir_y[cir_size] = y_8th_cnt;
-            cir_opa[cir_size] = x_fract[0] + x_fract[1];
+            p->cir_opa[cir_size] = x_fract[0] + x_fract[1];
 #if AA_EXTRA
-            cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
 #endif
             cir_size++;
 
             cir_x[cir_size] = x_int[0] - 1;
             cir_y[cir_size] = y_8th_cnt;
             uint32_t tmp = 2 * 4 + x_fract[2] + x_fract[3];
-            cir_opa[cir_size] = tmp;
+            p->cir_opa[cir_size] = tmp;
 #if AA_EXTRA
-            cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[2] - x_fract[3] + 1) / 2;
 #endif
             cir_size++;
         }
@@ -492,17 +482,17 @@ static void cir_calc_aa4(uint32_t r)
         else {
             cir_x[cir_size] = x_int[0];
             cir_y[cir_size] = y_8th_cnt;
-            cir_opa[cir_size] = x_fract[0] + x_fract[1] + x_fract[2];
+            p->cir_opa[cir_size] = x_fract[0] + x_fract[1] + x_fract[2];
 #if AA_EXTRA
-            cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
-            cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[0] - x_fract[1] + 1) / 2;
+            p->cir_opa[cir_size] += (x_fract[1] - x_fract[2] + 1) / 2;
 #endif
             cir_size++;
 
             uint32_t tmp = 3 * 4 + x_fract[3];
             cir_x[cir_size] = x_int[0] - 1;
             cir_y[cir_size] = y_8th_cnt;
-            cir_opa[cir_size] = tmp;
+            p->cir_opa[cir_size] = tmp;
 
             cir_size++;
         }
@@ -511,7 +501,7 @@ static void cir_calc_aa4(uint32_t r)
         i_start = 0;
     }
 
-    uint32_t mid = r * 723;
+    uint32_t mid = p->cfg.radius * 723;
     uint32_t mid_int = mid >> 10;
     if(cir_x[cir_size-1] != mid_int || cir_y[cir_size-1] != mid_int) {
 
@@ -526,66 +516,44 @@ static void cir_calc_aa4(uint32_t r)
             tmp = 15 - tmp;
         }
 
-        cir_opa[cir_size] = tmp;
+        p->cir_opa[cir_size] = tmp;
         cir_x[cir_size] = mid_int;
         cir_y[cir_size] = mid_int;
-//        printf("--b at %d\n", mid_int);
         cir_size++;
     }
 
     /*Build the second octet*/
-
     i_start = cir_size - 2;
     for(i = i_start; i >= 0; i--, cir_size++) {
         cir_x[cir_size] = cir_y[i];
         cir_y[cir_size] = cir_x[i];
-        cir_opa[cir_size] = cir_opa[i];
+        p->cir_opa[cir_size] = p->cir_opa[i];
     }
 
-    for(i = 0; i < cir_size; i++) {
-        uint32_t opa = cir_opa[i] * 100 / 16;
-//        printf("%d: %d,%d: %d\n", i, cir_x[i], cir_y[i], opa);
-    }
-
-
-    memset(x_start_on_y, 0xff, sizeof(x_start_on_y));
-    memset(opa_start_on_y, 0xff, sizeof(opa_start_on_y));
+    memset(p->x_start_on_y, 0xff, sizeof(p->x_start_on_y));
+    memset(p->opa_start_on_y, 0xff, sizeof(p->opa_start_on_y));
 
     uint32_t y = 0;
-    opa_start_on_y[0] = 0;
+    p->opa_start_on_y[0] = 0;
     i = 0;
     while(i < cir_size) {
-        opa_start_on_y[y] = i;
-        x_start_on_y[y] = cir_x[i];
+        p->opa_start_on_y[y] = i;
+        p->x_start_on_y[y] = cir_x[i];
         for(; cir_y[i] == y && i < cir_size; i++) {
-            x_start_on_y[y] = LV_MIN(x_start_on_y[y], cir_x[i]);
+            p->x_start_on_y[y] = LV_MIN(p->x_start_on_y[y], cir_x[i]);
         }
         y++;
     }
 
-//    printf("----------\n");
-
-    for(y = 0; y < r; y++) {
-        printf("y:%d, ", y);
-        printf("x:%d: ", x_start_on_y[y]);
-        uint32_t k;
-        uint32_t len = opa_start_on_y[y + 1] - opa_start_on_y[y];
-        for(k = 0; k < len; k++) {
-//            printf("%d, ", cir_opa[opa_start_on_y[y] + k] * 100 / 16);
-        }
-//        printf("\n");
-
-    }
-
-
+    p->cir_size = cir_size;
 }
 
-static lv_opa_t * get_next_line(lv_coord_t y, uint32_t * len, lv_coord_t * x_start)
+static lv_opa_t * get_next_line(lv_draw_mask_radius_param_t * p, lv_coord_t y, lv_coord_t * len, lv_coord_t * x_start)
 {
 
-    *len = opa_start_on_y[y + 1] - opa_start_on_y[y];
-    *x_start = x_start_on_y[y];
-    return &cir_opa[opa_start_on_y[y]];
+    *len = p->opa_start_on_y[y + 1] - p->opa_start_on_y[y];
+    *x_start = p->x_start_on_y[y];
+    return &p->cir_opa[p->opa_start_on_y[y]];
 }
 
 
@@ -609,10 +577,7 @@ void lv_draw_mask_radius_init(lv_draw_mask_radius_param_t * param, const lv_area
     param->dsc.cb = (lv_draw_mask_xcb_t)lv_draw_mask_radius;
     param->dsc.type = LV_DRAW_MASK_TYPE_RADIUS;
 
-    if(cir_r != radius) {
-        cir_calc_aa4(radius);
-        cir_r = radius;
-    }
+    cir_calc_aa4(param);
 }
 
 /**
@@ -1170,33 +1135,52 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_radius(lv_opa_t * m
     abs_x -= rect.x1;
     abs_y -= rect.y1;
 
-    uint32_t aa_len;
-    uint32_t x_start;
+    lv_coord_t aa_len;
+    lv_coord_t x_start;
     lv_coord_t cir_y;
     if(abs_y < radius) {
         cir_y = radius - abs_y - 1;
     } else {
         cir_y = abs_y - (h - radius);
     }
-    lv_opa_t * aa_opa = get_next_line(cir_y, &aa_len, &x_start);
-    lv_coord_t cir_x_right = w - radius + x_start;
-    lv_coord_t cir_x_left = radius - x_start;
+    lv_opa_t * aa_opa = get_next_line(p, cir_y, &aa_len, &x_start);
+    lv_coord_t cir_x_right = k + w - radius + x_start;
+    lv_coord_t cir_x_left = k + radius - x_start - 1;
     uint32_t i;
-    for(i = 0; i < aa_len; i++) {
-        lv_opa_t opa = aa_opa[aa_len - i -1] * 16;
-        mask_buf[k + cir_x_right + i] = opa;
-        mask_buf[k + cir_x_left - i] = opa;
-//            printf("opa: %d\n", aa_opa[aa_len - i -1] * 100 / 16);
-    }
 
-    /*Clean the right side*/
-    if(k + cir_x_right + i < len) {
-        lv_memset_00(&mask_buf[k + cir_x_right + i], len - (k + cir_x_right + i));
-    }
 
-    /*Clean the left side*/
-    if(k + cir_x_left + 1 > aa_len ) {
-        lv_memset_00(&mask_buf[k], k + cir_x_left - aa_len + 1);
+    if(outer == false) {
+        for(i = 0; i < aa_len; i++) {
+            lv_opa_t opa = aa_opa[aa_len - i -1] * 16;
+            if(cir_x_right + i >= 0 && cir_x_right + i < len) {
+                mask_buf[cir_x_right + i] = opa;
+            }
+            if(cir_x_left - i >= 0 && cir_x_left - i < len) {
+                mask_buf[cir_x_left - i] = opa;
+            }
+        }
+
+        /*Clean the right side*/
+        if(cir_x_right + i < len) {
+            lv_memset_00(&mask_buf[cir_x_right + i], len - (cir_x_right + i));
+        }
+
+        /*Clean the left side*/
+        if(cir_x_left + 1 > aa_len ) {
+            lv_memset_00(&mask_buf[k], cir_x_left - aa_len + 1);
+        }
+    } else {
+        for(i = 0; i < aa_len; i++) {
+            lv_opa_t opa = 255 - (aa_opa[aa_len - 1 - i] * 16);
+            if(cir_x_right + i >= 0 && cir_x_right + i < len) {
+                mask_buf[cir_x_right + i] = opa;
+            }
+            if(cir_x_left - i >= 0 && cir_x_left - i < len) {
+                mask_buf[cir_x_left - i] = opa;
+            }
+        }
+
+        lv_memset_00(&mask_buf[cir_x_left + 1], cir_x_right - cir_x_left - 1);
     }
 
     return LV_DRAW_MASK_RES_CHANGED;
@@ -1288,26 +1272,6 @@ LV_ATTRIBUTE_FAST_MEM static inline lv_opa_t mask_mix(lv_opa_t mask_act, lv_opa_
     if(mask_new <= LV_OPA_MIN) return 0;
 
     return LV_UDIV255(mask_act * mask_new);// >> 8);
-}
-
-/**
- * Approximate the sqrt near to an already calculated value
- * @param q store the result here
- * @param ref the reference point (already calculated sqrt)
- * @param x the value which sqrt should be approximated
- */
-LV_ATTRIBUTE_FAST_MEM static inline void sqrt_approx(lv_sqrt_res_t * q, lv_sqrt_res_t * ref, uint32_t x)
-{
-    x = x << 8; /*Upscale for extra precision*/
-
-    uint32_t raw = (ref->i << 4) + (ref->f >> 4);
-    uint32_t raw2 = raw * raw;
-
-    int32_t d = x - raw2;
-    d = (int32_t)d / (int32_t)(2 * raw) + raw;
-
-    q->i = d >> 4;
-    q->f = (d & 0xF) << 4;
 }
 
 #endif /*LV_DRAW_COMPLEX*/

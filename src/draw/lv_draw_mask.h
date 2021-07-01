@@ -158,6 +158,10 @@ typedef struct {
         uint8_t outer: 1;
     } cfg;
 
+    lv_opa_t cir_opa[1000];
+    uint32_t cir_size;
+    uint8_t x_start_on_y[1000];
+    uint8_t opa_start_on_y[1000];
 } lv_draw_mask_radius_param_t;
 
 
