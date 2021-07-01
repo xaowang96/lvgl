@@ -405,7 +405,7 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
         /*Only the mask matters*/
         if(opa > LV_OPA_MAX) {
             for(y = 0; y < draw_area_h; y++) {
-#if 0
+#if 1
                 for(x = 0; x < draw_area_w; x++) {
 #if LV_COLOR_SCREEN_TRANSP
                     FILL_NORMAL_MASK_PX_SCR_TRANSP(x, color)
@@ -467,8 +467,8 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
 #endif
                 }
 #endif
-                disp_buf_first += disp_w;
-                mask += draw_area_w;
+                disp_buf_first += (disp_w-draw_area_w);
+//                mask += draw_area_w;
             }
         }
         /*Handle opa and mask values too*/

@@ -406,6 +406,7 @@ void lv_circ_next(lv_point_t * c, lv_coord_t * tmp)
 
 static void cir_calc_aa4(lv_draw_mask_radius_param_t * p)
 {
+    if(p->cfg.radius == 0) return;
     uint32_t y_8th_cnt = 0;
     lv_point_t cp;
     lv_coord_t tmp;
@@ -568,6 +569,7 @@ void lv_draw_mask_radius_init(lv_draw_mask_radius_param_t * param, const lv_area
 {
     lv_coord_t w = lv_area_get_width(rect);
     lv_coord_t h = lv_area_get_height(rect);
+    if(radius < 0) radius = 0;
     int32_t short_side = LV_MIN(w, h);
     if(radius > short_side >> 1) radius = short_side >> 1;
 
@@ -576,6 +578,8 @@ void lv_draw_mask_radius_init(lv_draw_mask_radius_param_t * param, const lv_area
     param->cfg.outer = inv ? 1 : 0;
     param->dsc.cb = (lv_draw_mask_xcb_t)lv_draw_mask_radius;
     param->dsc.type = LV_DRAW_MASK_TYPE_RADIUS;
+
+//    printf("init: %d, %d, %d, %d: r:%d, %s\n", rect->x1, rect->y1, rect->x2, rect->y2, radius, inv ? "inv" : "norm");
 
     cir_calc_aa4(param);
 }
@@ -1081,6 +1085,9 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_radius(lv_opa_t * m
                                                                     lv_coord_t abs_y, lv_coord_t len,
                                                                     lv_draw_mask_radius_param_t * p)
 {
+
+
+
     bool outer = p->cfg.outer;
     int32_t radius = p->cfg.radius;
     lv_area_t rect;
@@ -1128,6 +1135,13 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_radius(lv_opa_t * m
         }
         return LV_DRAW_MASK_RES_CHANGED;
     }
+//    printf("exec: x:%d.. %d, y:%d: r:%d, %s\n", abs_x, abs_x + len - 1, abs_y, p->cfg.radius, p->cfg.outer ? "inv" : "norm");
+
+
+//    if( abs_x == 276 && abs_x + len - 1 == 479 && abs_y == 63 && p->cfg.radius == 5 && p->cfg.outer == 1) {
+//        char x = 0;
+//    }
+//exec: x:276.. 479, y:63: r:5, inv)
 
     int32_t k = rect.x1 - abs_x; /*First relevant coordinate on the of the mask*/
     int32_t w = lv_area_get_width(&rect);
@@ -1146,41 +1160,41 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_radius(lv_opa_t * m
     lv_opa_t * aa_opa = get_next_line(p, cir_y, &aa_len, &x_start);
     lv_coord_t cir_x_right = k + w - radius + x_start;
     lv_coord_t cir_x_left = k + radius - x_start - 1;
-    uint32_t i;
-
+    lv_coord_t i;
 
     if(outer == false) {
         for(i = 0; i < aa_len; i++) {
             lv_opa_t opa = aa_opa[aa_len - i -1] * 16;
             if(cir_x_right + i >= 0 && cir_x_right + i < len) {
-                mask_buf[cir_x_right + i] = opa;
+                mask_buf[cir_x_right + i] = mask_mix(opa, mask_buf[cir_x_right + i]);
             }
             if(cir_x_left - i >= 0 && cir_x_left - i < len) {
-                mask_buf[cir_x_left - i] = opa;
+                mask_buf[cir_x_left - i] = mask_mix(opa, mask_buf[cir_x_left - i]);
             }
         }
 
         /*Clean the right side*/
-        if(cir_x_right + i < len) {
-            lv_memset_00(&mask_buf[cir_x_right + i], len - (cir_x_right + i));
-        }
+        cir_x_right = LV_CLAMP(0, cir_x_right + i, len);
+        lv_memset_00(&mask_buf[cir_x_right], len - cir_x_right);
 
         /*Clean the left side*/
-        if(cir_x_left + 1 > aa_len ) {
-            lv_memset_00(&mask_buf[k], cir_x_left - aa_len + 1);
-        }
+        cir_x_left = LV_CLAMP(0, cir_x_left - aa_len + 1, len);
+        lv_memset_00(&mask_buf[0], cir_x_left);
+
     } else {
         for(i = 0; i < aa_len; i++) {
             lv_opa_t opa = 255 - (aa_opa[aa_len - 1 - i] * 16);
             if(cir_x_right + i >= 0 && cir_x_right + i < len) {
-                mask_buf[cir_x_right + i] = opa;
+                mask_buf[cir_x_right + i] = mask_mix(opa, mask_buf[cir_x_right + i]);
             }
             if(cir_x_left - i >= 0 && cir_x_left - i < len) {
-                mask_buf[cir_x_left - i] = opa;
+                mask_buf[cir_x_left - i] = mask_mix(opa, mask_buf[cir_x_left - i]);
             }
         }
 
-        lv_memset_00(&mask_buf[cir_x_left + 1], cir_x_right - cir_x_left - 1);
+        lv_coord_t clr_start = LV_CLAMP(0, cir_x_left + 1, len - 1);
+        lv_coord_t clr_len = LV_CLAMP(0, cir_x_right - clr_start, len - clr_start);
+        lv_memset_00(&mask_buf[clr_start], clr_len);
     }
 
     return LV_DRAW_MASK_RES_CHANGED;
