@@ -147,6 +147,7 @@ typedef struct {
     uint16_t delta_deg;
 } lv_draw_mask_angle_param_t;
 
+struct _lv_draw_mask_radius_circle_dsc;
 typedef struct {
     /*The first element must be the common descriptor*/
     _lv_draw_mask_common_dsc_t dsc;
@@ -158,10 +159,7 @@ typedef struct {
         uint8_t outer: 1;
     } cfg;
 
-    lv_opa_t cir_opa[300];
-    uint32_t cir_size;
-    uint8_t x_start_on_y[300];
-    uint8_t opa_start_on_y[300];
+    struct _lv_draw_mask_radius_circle_dsc * circle;
 } lv_draw_mask_radius_param_t;
 
 
