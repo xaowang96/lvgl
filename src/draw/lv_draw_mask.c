@@ -25,6 +25,7 @@ typedef struct _lv_draw_mask_radius_circle_dsc {
     lv_opa_t cir_opa[300];
     uint8_t x_start_on_y[300];
     uint8_t opa_start_on_y[300];
+    uint8_t radius;
 } _lv_draw_mask_radius_circle_dsc_t;
 
 /**********************
@@ -587,7 +588,10 @@ void lv_draw_mask_radius_init(lv_draw_mask_radius_param_t * param, const lv_area
     param->dsc.cb = (lv_draw_mask_xcb_t)lv_draw_mask_radius;
     param->dsc.type = LV_DRAW_MASK_TYPE_RADIUS;
 
-    cir_calc_aa4(circle_cache, radius);
+    if(circle_cache[0].radius != radius) {
+        cir_calc_aa4(circle_cache, radius);
+        circle_cache[0].radius = radius;
+    }
     param->circle = circle_cache;
 }
 
