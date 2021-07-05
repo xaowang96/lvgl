@@ -166,7 +166,7 @@ typedef struct {
         uint8_t outer: 1;
     } cfg;
 
-    struct _lv_draw_mask_radius_circle_dsc circle;
+    struct _lv_draw_mask_radius_circle_dsc * circle;
 } lv_draw_mask_radius_param_t;
 
 
