@@ -405,7 +405,7 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
         /*Only the mask matters*/
         if(opa > LV_OPA_MAX) {
             for(y = 0; y < draw_area_h; y++) {
-#if 1
+#if 0
                 for(x = 0; x < draw_area_w; x++) {
 #if LV_COLOR_SCREEN_TRANSP
                     FILL_NORMAL_MASK_PX_SCR_TRANSP(x, color)
@@ -414,7 +414,7 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
 #endif
                 }
 #else
-                for(x = 0; x < draw_area_w && ((lv_uintptr_t)(mask + x) & 0x3); x++) {
+                for(x = 0; x < draw_area_w && ((lv_uintptr_t)(mask) & 0x3); x++) {
 #if LV_COLOR_SCREEN_TRANSP
                     FILL_NORMAL_MASK_PX_SCR_TRANSP(x, color)
 #else
@@ -422,9 +422,9 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
 #endif
                 }
 
-                uint32_t * mask32 = (uint32_t *)&mask[x];
                 for(; x <= x_end4; x += 4) {
-                    if((*mask32) == 0xFFFFFFFF) {
+                    uint32_t mask32 = *((uint32_t *)mask);
+                    if(mask32 == 0xFFFFFFFF) {
                         if((lv_uintptr_t)disp_buf_first & 0x3) {
                             *(disp_buf_first + 0) = color;
                             uint32_t * d = (uint32_t * )(disp_buf_first + 1);
@@ -439,7 +439,7 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
                         disp_buf_first+= 4;
                         mask += 4;
                     }
-                    else if(*mask32) {
+                    else if(mask32) {
 #if LV_COLOR_SCREEN_TRANSP
                         FILL_NORMAL_MASK_PX_SCR_TRANSP(x, color)
                         FILL_NORMAL_MASK_PX_SCR_TRANSP(x + 1, color)
@@ -456,7 +456,6 @@ LV_ATTRIBUTE_FAST_MEM static void fill_normal(const lv_area_t * disp_area, lv_co
                         disp_buf_first += 4;
 
                     }
-                    mask32++;
                 }
 
                 for(; x < draw_area_w ; x++) {
