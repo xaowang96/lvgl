@@ -52,7 +52,6 @@ LV_ATTRIBUTE_FAST_MEM static inline lv_opa_t mask_mix(lv_opa_t mask_act, lv_opa_
 /**********************
  *  STATIC VARIABLES
  **********************/
-static _lv_draw_mask_radius_circle_dsc_t circle_cache[1];
 
 /**********************
  *      MACROS
@@ -127,12 +126,18 @@ LV_ATTRIBUTE_FAST_MEM lv_draw_mask_res_t lv_draw_mask_apply(lv_opa_t * mask_buf,
  */
 void * lv_draw_mask_remove_id(int16_t id)
 {
-    void * p = NULL;
+    _lv_draw_mask_common_dsc_t * p = NULL;
 
     if(id != LV_MASK_ID_INV) {
         p = LV_GC_ROOT(_lv_draw_mask_list[id]).param;
+        if(p->type == LV_DRAW_MASK_TYPE_RADIUS) {
+            lv_draw_mask_radius_param_t * rp = LV_GC_ROOT(_lv_draw_mask_list[id]).param;
+            lv_mem_free(rp->circle.cir_opa);
+        }
+
         LV_GC_ROOT(_lv_draw_mask_list[id]).param = NULL;
         LV_GC_ROOT(_lv_draw_mask_list[id]).custom_id = NULL;
+
     }
 
     return p;
@@ -410,12 +415,17 @@ static void cir_calc_aa4(_lv_draw_mask_radius_circle_dsc_t * c, lv_coord_t radiu
     lv_circ_init(&cp, &tmp, radius * 4);
     int32_t i;
 
+
+    c->cir_opa = lv_mem_alloc(radius * 4 + 3);
+    c->opa_start_on_y = c->cir_opa + 2 * radius + 1;
+    c->x_start_on_y = c->cir_opa + 3 * radius + 2;
+
     int32_t cir_x[1000];
     int32_t cir_y[1000];
 
     uint32_t x_int[4];
     uint32_t x_fract[4];
-    uint32_t cir_size = 0;
+    lv_coord_t cir_size = 0;
     x_int[0] = cp.x >> 2;
     x_fract[0] = 0;
     while(lv_circ_cont(&cp)) {
@@ -485,8 +495,8 @@ static void cir_calc_aa4(_lv_draw_mask_radius_circle_dsc_t * c, lv_coord_t radiu
         y_8th_cnt++;
     }
 
-    uint32_t mid = radius * 723;
-    uint32_t mid_int = mid >> 10;
+    int32_t mid = radius * 723;
+    int32_t mid_int = mid >> 10;
     if(cir_x[cir_size-1] != mid_int || cir_y[cir_size-1] != mid_int) {
         tmp = mid - (mid_int << 10);
         if(tmp <= 512) {
@@ -524,8 +534,6 @@ static void cir_calc_aa4(_lv_draw_mask_radius_circle_dsc_t * c, lv_coord_t radiu
         }
         y++;
     }
-
-    c->cir_size = cir_size;
 }
 
 static lv_opa_t * get_next_line(_lv_draw_mask_radius_circle_dsc_t * c, lv_coord_t y, lv_coord_t * len, lv_coord_t * x_start)
@@ -1065,9 +1073,6 @@ LV_ATTRIBUTE_FAST_MEM static lv_draw_mask_res_t lv_draw_mask_radius(lv_opa_t * m
                                                                     lv_coord_t abs_y, lv_coord_t len,
                                                                     lv_draw_mask_radius_param_t * p)
 {
-
-
-
     bool outer = p->cfg.outer;
     int32_t radius = p->cfg.radius;
     lv_area_t rect;
